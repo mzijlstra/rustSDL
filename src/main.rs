@@ -34,37 +34,33 @@ fn main() -> Result<(), String> {
     let frames_per_anim = 4;
     let sprite_tile_size = (32,32);
 
-    // Baby - walk animation
-    let mut source_rect_0 = Rect::new(0, 0, sprite_tile_size.0, sprite_tile_size.0);
-    let mut dest_rect_0 = Rect::new(0, 0, sprite_tile_size.0*4, sprite_tile_size.0*4);
-    dest_rect_0.center_on(Point::new(-64,120));
-
     // King - walk animation
     let mut source_rect_1 = Rect::new(0, 32, sprite_tile_size.0, sprite_tile_size.0);
     let mut dest_rect_1 = Rect::new(0, 32, sprite_tile_size.0*4, sprite_tile_size.0*4);
-    dest_rect_1.center_on(Point::new(0,240));
-
-    // Soldier - walk animation
-    let mut source_rect_2 = Rect::new(0, 64, sprite_tile_size.0, sprite_tile_size.0);
-    let mut dest_rect_2 = Rect::new(0, 64, sprite_tile_size.0*4, sprite_tile_size.0*4);
-    dest_rect_2.center_on(Point::new(440,360));
+    dest_rect_1.center_on(Point::new(320,240));
 
     let mut timer = sdl_context.timer()?;
     let mut event_pump = sdl_context.event_pump()?;
 
     let mut running = true;
-    let mut going_left = true;
+    let mut going_left = false;
     let mut frame = 0;
+    let mut moving = false;
     while running {
         let start_tick = timer.ticks();
 
         for event in event_pump.poll_iter() {
             match event {
                 Event::KeyDown {keycode: Some(Keycode::Left), ..} => {
+                    moving = true;
                     going_left = true;
                 }
                 Event::KeyDown {keycode: Some(Keycode::Right), ..} => {
+                    moving = true;
                     going_left = false;
+                }
+                Event::KeyUp {keycode: Some(Keycode::Left), ..} | Event::KeyUp {keycode: Some(Keycode::Right), ..} => {
+                    moving = false;
                 }
                 Event::Quit {..} | Event::KeyDown {keycode: Some(Keycode::Escape), ..} => {
                     running = false;
@@ -73,34 +69,32 @@ fn main() -> Result<(), String> {
             }
         }
 
-
-        // set the current frame for time
-        source_rect_0.set_x(32 * frame);
-        dest_rect_0.set_x((dest_rect_0.x() + 5) % 768);
-
-        source_rect_1.set_x(32 * frame);
-        let mut x = dest_rect_1.x();
-        if going_left {
-            x -= 6;
-            if x < -128 {
-                x = 608;
+        let mut new_x = dest_rect_1.x();
+        if moving {
+            let delta;
+            frame = (frame + 1) % frames_per_anim;
+            if going_left {
+                delta = -6
+            } else {
+                delta = 6;
+            }
+            if new_x + delta < -128 {
+                new_x = 608;
+            } else if new_x + delta > 608 {
+                new_x = -128;
+            } else {
+                new_x = new_x + delta;
             }
         } else {
-            x += 6;
-            if x > 608 {
-                x = -128;
-            }
+            frame = 0;
         }
-        dest_rect_1.set_x( x );
 
-        source_rect_2.set_x(32 * frame);
-        dest_rect_2.set_x( (dest_rect_2.x() + 7) % 768);
+        source_rect_1.set_x(32 * frame);
+        dest_rect_1.set_x( new_x );
 
         canvas.clear();
         // copy the frame to the canvas
-        canvas.copy_ex(&texture, Some(source_rect_0), Some(dest_rect_0), 0.0, None, false, false)?;
         canvas.copy_ex(&texture, Some(source_rect_1), Some(dest_rect_1), 0.0, None, going_left, false)?;
-        canvas.copy_ex(&texture, Some(source_rect_2), Some(dest_rect_2), 0.0, None, false, false)?;
         canvas.present();
 
         let stop_tick = timer.ticks();
@@ -114,7 +108,6 @@ fn main() -> Result<(), String> {
         } else {
             println!("BIG frame time: {}", frame_time);
         }
-        frame = (frame + 1) % frames_per_anim;
     }
 
     Ok(())
