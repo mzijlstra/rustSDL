@@ -87,15 +87,15 @@ fn main() -> Result<(), String> {
     player.dest.center_on(Point::new(window_size.0 / 4, window_size.1 / 2));
 
     let mut timer = sdl_context.timer()?;
-    let mut event_pump = sdl_context.event_pump()?;
-
-    let mut running = true;
+    let mut time = timer.ticks();
+    let mut second = time + 1000;
     let mut frame_count = 0;
-    let mut prev_second = 0;
+
+    let mut event_pump = sdl_context.event_pump()?;
+    let mut running = true;
     while running {
         let start_tick = timer.ticks();
-        frame_count += 1;
-
+        
         for event in event_pump.poll_iter() {
             match event {
                 Event::KeyDown {
@@ -279,22 +279,19 @@ fn main() -> Result<(), String> {
         )?;
         canvas.present();
 
-        let stop_tick = timer.ticks();
-        if stop_tick / 1000 > prev_second {
-            //println!("frames: {}", frame_count);
-            frame_count = 0;
-            prev_second += 1;
+        time += 10;
+        while timer.ticks() < time {
+            std::thread::sleep(Duration::from_millis(1));
         }
-
-        let frame_time = stop_tick - start_tick;
-
-        if frame_time < 10 {
-            let sleep_time = (10 - frame_time) as u64;
-            if sleep_time > 1 {
-                std::thread::sleep(Duration::from_millis(sleep_time));
-            }
-        } else {
-            //println!("BIG frame time: {}", frame_time);
+        frame_count += 1;
+        if timer.ticks() > second {
+            second += 1000;
+            println!("frames: {}", frame_count);
+            frame_count = 0;
+        }
+        let stop_tick = timer.ticks();
+        if stop_tick - start_tick > 12 {
+            println!("big frame size: {}", stop_tick - start_tick);
         }
     }
 
