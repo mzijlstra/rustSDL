@@ -61,18 +61,15 @@ fn main() -> Result<(), String> {
     canvas.set_draw_color(sdl2::pixels::Color::RGBA(0, 0, 0, 255));
 
     // sprites and background form: https://opengameart.org/content/space-ship-shooter-pixel-art-assets
-    let ship_texture = texture_creator.load_texture(Path::new("assets/ship.png"))?;
-    let bg_texture = texture_creator.load_texture(Path::new("assets/desert-background.png"))?;
+    let ship_texture = texture_creator.load_texture(Path::new("assets/ship-test.png"))?;
+    let bg_texture = texture_creator.load_texture(Path::new("assets/desert-background-test.png"))?;
 
     // background
-    let source_bg = Rect::new(0, 0, 272, 256);
-    let mut dest_bg_array: [Rect; 6] = [
-        Rect::new(0, 0, 272, 256),
-        Rect::new(272, 0, 272, 256),
-        Rect::new(544, 0, 272, 256),
-        Rect::new(0, 256, 272, 256),
-        Rect::new(272, 256, 272, 256),
-        Rect::new(544, 256, 272, 256),
+    let source_bg = Rect::new(0, 0, 272, 300);
+    let mut dest_bg_array: [Rect; 3] = [
+        Rect::new(0, 0, 272, 300),
+        Rect::new(272, 0, 272, 300),
+        Rect::new(544, 0, 272, 300),
     ];
 
     // ship related
