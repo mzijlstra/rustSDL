@@ -6,8 +6,10 @@ use sdl2::image::LoadTexture;
 use sdl2::keyboard::Keycode;
 use sdl2::rect::Point;
 use sdl2::rect::Rect;
+use sdl2::video::FullscreenType;
 use std::path::Path;
 use std::time::Duration;
+use std::time::Instant;
 
 struct Player {
     source: Rect,
@@ -75,7 +77,7 @@ fn main() -> Result<(), String> {
         .map_err(|e| e.to_string())?;
 
     let texture_creator = canvas.texture_creator();
-    canvas.set_draw_color(sdl2::pixels::Color::RGBA(0, 0, 0, 255));
+    //canvas.set_draw_color(sdl2::pixels::Color::RGBA(0, 0, 0, 255));
 
     // sprites and background form: https://opengameart.org/content/space-ship-shooter-pixel-art-assets
     let ship_texture = texture_creator.load_texture(Path::new("assets/ship-sheet.png"))?;
@@ -105,15 +107,13 @@ fn main() -> Result<(), String> {
         window_actual_size.1 as i32 / 2,
     ));
 
-    let mut timer = sdl_context.timer()?;
-    let mut time = timer.ticks();
-    let mut second = time + 1000;
     let mut frame_count = 0;
+    let mut second_time = Instant::now();
 
     let mut event_pump = sdl_context.event_pump()?;
     let mut running = true;
     while running {
-        let start_tick = timer.ticks();
+        let frame_time = Instant::now();
 
         for event in event_pump.poll_iter() {
             match event {
@@ -216,6 +216,22 @@ fn main() -> Result<(), String> {
                     ..
                 } => {
                     running = false;
+                }
+                Event::KeyDown {
+                    keycode: Some(Keycode::F),
+                    ..
+                } => {
+                    match canvas.window().fullscreen_state() {
+                        FullscreenType::Off => {
+                            canvas.window_mut().set_fullscreen(FullscreenType::True)?;
+                        }
+                        FullscreenType::True => {
+                            canvas.window_mut().set_fullscreen(FullscreenType::Off)?;
+                        }
+                        FullscreenType::Desktop => {
+                            canvas.window_mut().set_fullscreen(FullscreenType::Off)?;
+                        }
+                    }
                 }
                 _ => {}
             }
@@ -340,19 +356,18 @@ fn main() -> Result<(), String> {
         )?;
         canvas.present();
 
-        time += 8; // will create about 125fps
-        while timer.ticks() < time {
-            std::thread::sleep(Duration::from_millis(1));
+        let target_frame = Duration::from_nanos(16666667);
+        while frame_time.elapsed() < target_frame {
+            std::thread::sleep(Duration::from_micros(100));
         }
         frame_count += 1;
-        if timer.ticks() > second {
-            second += 1000;
+        if second_time.elapsed() >= Duration::from_secs(1) {
+            second_time = Instant::now();
             println!("frames: {}", frame_count);
             frame_count = 0;
         }
-        let stop_tick = timer.ticks();
-        if stop_tick - start_tick > 20 {
-            println!("big frame size: {}", stop_tick - start_tick);
+        if frame_time.elapsed() > Duration::from_millis(18) {
+            println!("big frame size: {}", frame_time.elapsed().as_millis());
         }
     }
 
