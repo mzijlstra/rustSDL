@@ -83,14 +83,11 @@ fn main() -> Result<(), String> {
     let bg_texture = texture_creator.load_texture(Path::new("assets/desert-background.png"))?;
 
     // background
-    let source_bg = Rect::new(0, 0, 272, 256);
-    let mut dest_bg_array: [Rect; 6] = [
-        Rect::new(0, 0, 272, 256),
-        Rect::new(272, 0, 272, 256),
-        Rect::new(544, 0, 272, 256),
-        Rect::new(0, 256, 272, 256),
-        Rect::new(272, 256, 272, 256),
-        Rect::new(544, 256, 272, 256),
+    let source_bg = Rect::new(0, 0, 272, 300);
+    let mut dest_bg_array: [Rect; 3] = [
+        Rect::new(0, 0, 272, 300),
+        Rect::new(272, 0, 272, 300),
+        Rect::new(544, 0, 272, 300),
     ];
 
     // ship related
