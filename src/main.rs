@@ -12,44 +12,61 @@ use std::time::Duration;
 struct Player {
     source: Rect,
     dest: Rect,
+    flame_source: Rect,
+    flame_dest: Rect,
     up: bool,
     down: bool,
     left: bool,
     right: bool,
     up_count: u32,
     down_count: u32,
+    right_count: i32,
     flame: i32,
+    tilt: i32,
 }
 
 impl Default for Player {
     fn default() -> Player {
         Player {
-            source: Rect::new(0,0,0,0),
-            dest: Rect::new(0,0,0,0),
+            source: Rect::new(0, 0, 0, 0),
+            dest: Rect::new(0, 0, 0, 0),
+            flame_source: Rect::new(0, 0, 0, 0),
+            flame_dest: Rect::new(0, 0, 0, 0),
             up: false,
             down: false,
             left: false,
-            right: false,        
+            right: false,
             up_count: 0,
             down_count: 0,
-            flame: 0,
+            right_count: 0,
+            flame: 2,
+            tilt: 32,
         }
     }
 }
 
 fn main() -> Result<(), String> {
-    let window_size: (i32, i32) = (480, 300);
+    let window_desired_size: (i32, i32) = (640, 360);
     let sdl_context = sdl2::init()?;
     let video_subsystem = sdl_context.video()?;
     let _image_context = sdl2::image::init(InitFlag::PNG)?;
 
     let window = video_subsystem
-        .window("SDL2", window_size.0 as u32, window_size.1 as u32)
+        .window(
+            "SDL2",
+            window_desired_size.0 as u32,
+            window_desired_size.1 as u32,
+        )
         .position_centered()
         //.fullscreen()
         .build()
         .map_err(|e| e.to_string())?;
 
+    let window_actual_size: (u32, u32) = window.size();
+    println!(
+        "window size: {},{}",
+        window_actual_size.0, window_actual_size.1
+    );
 
     let mut canvas = window
         .into_canvas()
@@ -61,7 +78,8 @@ fn main() -> Result<(), String> {
     canvas.set_draw_color(sdl2::pixels::Color::RGBA(0, 0, 0, 255));
 
     // sprites and background form: https://opengameart.org/content/space-ship-shooter-pixel-art-assets
-    let ship_texture = texture_creator.load_texture(Path::new("assets/ship.png"))?;
+    let ship_texture = texture_creator.load_texture(Path::new("assets/ship-sheet.png"))?;
+    let flame_texture = texture_creator.load_texture(Path::new("assets/flame-sheet.png"))?;
     let bg_texture = texture_creator.load_texture(Path::new("assets/desert-background.png"))?;
 
     // background
@@ -76,15 +94,19 @@ fn main() -> Result<(), String> {
     ];
 
     // ship related
-    let frames_per_anim = 2;
-    let sprite_tile_size = (24, 16);
+    let sprite_tile_size = (16, 16);
 
     let mut player = Player {
-        source: Rect::new(24, 32, sprite_tile_size.0, sprite_tile_size.1),
+        source: Rect::new(32, 0, sprite_tile_size.0, sprite_tile_size.1),
         dest: Rect::new(0, 0, sprite_tile_size.0, sprite_tile_size.1),
+        flame_source: Rect::new(0, 0, sprite_tile_size.0, sprite_tile_size.1),
+        flame_dest: Rect::new(0, 0, sprite_tile_size.0, sprite_tile_size.1),
         ..Default::default()
     };
-    player.dest.center_on(Point::new(window_size.0 / 4, window_size.1 / 2));
+    player.dest.center_on(Point::new(
+        window_actual_size.0 as i32 / 4,
+        window_actual_size.1 as i32 / 2,
+    ));
 
     let mut timer = sdl_context.timer()?;
     let mut time = timer.ticks();
@@ -95,26 +117,28 @@ fn main() -> Result<(), String> {
     let mut running = true;
     while running {
         let start_tick = timer.ticks();
-        
+
         for event in event_pump.poll_iter() {
             match event {
                 Event::KeyDown {
                     keycode: Some(Keycode::Up),
                     ..
-                } | Event::KeyDown {
+                }
+                | Event::KeyDown {
                     keycode: Some(Keycode::W),
                     ..
-                }=> {
+                } => {
                     if !player.up {
                         player.up = true;
                         player.down = false;
-                        player.up_count = 0;    
+                        player.up_count = 0;
                     }
                 }
                 Event::KeyUp {
                     keycode: Some(Keycode::Up),
                     ..
-                } | Event::KeyUp {
+                }
+                | Event::KeyUp {
                     keycode: Some(Keycode::W),
                     ..
                 } => {
@@ -123,20 +147,22 @@ fn main() -> Result<(), String> {
                 Event::KeyDown {
                     keycode: Some(Keycode::Down),
                     ..
-                } | Event::KeyDown {
+                }
+                | Event::KeyDown {
                     keycode: Some(Keycode::S),
                     ..
                 } => {
                     if !player.down {
                         player.down = true;
                         player.up = false;
-                        player.down_count = 0;    
+                        player.down_count = 0;
                     }
                 }
                 Event::KeyUp {
                     keycode: Some(Keycode::Down),
                     ..
-                } | Event::KeyUp {
+                }
+                | Event::KeyUp {
                     keycode: Some(Keycode::S),
                     ..
                 } => {
@@ -145,7 +171,8 @@ fn main() -> Result<(), String> {
                 Event::KeyDown {
                     keycode: Some(Keycode::Left),
                     ..
-                } | Event::KeyDown {
+                }
+                | Event::KeyDown {
                     keycode: Some(Keycode::A),
                     ..
                 } => {
@@ -155,7 +182,8 @@ fn main() -> Result<(), String> {
                 Event::KeyUp {
                     keycode: Some(Keycode::Left),
                     ..
-                } | Event::KeyUp {
+                }
+                | Event::KeyUp {
                     keycode: Some(Keycode::A),
                     ..
                 } => {
@@ -164,17 +192,22 @@ fn main() -> Result<(), String> {
                 Event::KeyDown {
                     keycode: Some(Keycode::Right),
                     ..
-                } | Event::KeyDown {
+                }
+                | Event::KeyDown {
                     keycode: Some(Keycode::D),
                     ..
                 } => {
-                    player.left = false;
-                    player.right = true;
+                    if !player.right {
+                        player.left = false;
+                        player.right = true;
+                        player.right_count = 0;
+                    }
                 }
                 Event::KeyUp {
                     keycode: Some(Keycode::Right),
                     ..
-                } | Event::KeyUp {
+                }
+                | Event::KeyUp {
                     keycode: Some(Keycode::D),
                     ..
                 } => {
@@ -203,42 +236,60 @@ fn main() -> Result<(), String> {
         // move ship
         let mut ship_x = player.dest.x();
         let mut ship_y = player.dest.y();
-        let mut ship_tilt = 32;
         if player.up {
-            // move ship
             let delta_y = -1;
             if ship_y + delta_y >= -8 {
                 ship_y = ship_y + delta_y;
             }
-            // tilt ship
             player.up_count += 1;
-            if player.up_count > 15 {
-                ship_tilt = 0;
-            } else {
-                ship_tilt = 16;
-            }
-        } else if player.down {
-            // move ship
+        } else if player.up_count > 0 {
+            player.up_count -= 1;
+        }
+
+        if player.down {
             let delta_y = 1;
-            if ship_y + delta_y < 8 + window_size.1 - sprite_tile_size.1 as i32 {
+            if ship_y + delta_y < 8 + window_actual_size.1 as i32 - sprite_tile_size.1 as i32 {
                 ship_y = ship_y + delta_y;
             }
-            // tilt ship
             player.down_count += 1;
-            if player.down_count > 15 {
-                ship_tilt = 64;
-            } else {
-                ship_tilt = 48;
-            }
+        } else if player.down_count > 0 {
+            player.down_count -= 1;
         }
-        
+
+        // tilt ship up or down
+        if (player.up_count > 0 && player.down_count > 0)
+            || (player.up_count == 0 && player.down_count == 0)
+        {
+            player.tilt = 2;
+            if player.up {
+                player.down_count /= 2;
+            } else if player.down {
+                player.up_count /= 2;
+            }
+        } else if player.up_count < 16 && player.down_count == 0 {
+            player.tilt = 1;
+        } else if player.up_count >= 16 {
+            player.tilt = 0;
+            player.up_count = 16;
+        } else if player.up_count == 0 && player.down_count < 16 {
+            player.tilt = 3;
+        } else if player.down_count >= 16 {
+            player.tilt = 4;
+            player.down_count = 16;
+        }
+
         if player.right {
             // animate exhaust flame
-            if frame_count % 5 == 0 {
-                player.flame = (player.flame + 1) % frames_per_anim;
+            if player.right_count < 6 {
+                player.flame = 2;
+            } else if player.right_count < 12 {
+                player.flame = 3;
+            } else {
+                player.right_count = 0;
             }
+            player.right_count += 1;
             let delta_x = 1;
-            if ship_x + delta_x < window_size.0 - sprite_tile_size.0 as i32 {
+            if ship_x + delta_x < window_actual_size.0 as i32 - sprite_tile_size.0 as i32 {
                 ship_x += delta_x;
             }
         } else if player.left {
@@ -246,14 +297,18 @@ fn main() -> Result<(), String> {
             if ship_x + delta_x > 0 {
                 ship_x += delta_x;
             }
-            player.flame = 3;
+            player.flame = 0;
         } else {
-            player.flame = 2;
+            player.flame = 1;
         }
-        player.source.set_y(ship_tilt);
-        player.source.set_x(24 * player.flame);
+        player.source.set_x(player.tilt * sprite_tile_size.0 as i32);
+        player
+            .flame_source
+            .set_x(player.flame * sprite_tile_size.0 as i32);
         player.dest.set_x(ship_x);
         player.dest.set_y(ship_y);
+        player.flame_dest.set_x(ship_x - 9);
+        player.flame_dest.set_y(ship_y);
 
         // draw on screen
         canvas.clear();
@@ -269,6 +324,15 @@ fn main() -> Result<(), String> {
             )?;
         }
         canvas.copy_ex(
+            &flame_texture,
+            Some(player.flame_source),
+            Some(player.flame_dest),
+            0.0,
+            None,
+            false,
+            false,
+        )?;
+        canvas.copy_ex(
             &ship_texture,
             Some(player.source),
             Some(player.dest),
@@ -279,7 +343,7 @@ fn main() -> Result<(), String> {
         )?;
         canvas.present();
 
-        time += 10;
+        time += 8; // will create about 125fps
         while timer.ticks() < time {
             std::thread::sleep(Duration::from_millis(1));
         }
@@ -290,7 +354,7 @@ fn main() -> Result<(), String> {
             frame_count = 0;
         }
         let stop_tick = timer.ticks();
-        if stop_tick - start_tick > 12 {
+        if stop_tick - start_tick > 20 {
             println!("big frame size: {}", stop_tick - start_tick);
         }
     }
