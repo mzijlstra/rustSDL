@@ -107,11 +107,13 @@ fn main() -> Result<(), String> {
         window_actual_size.1 as i32 / 2,
     ));
 
-    let mut frame_count = 0;
-    let mut second_time = Instant::now();
-
+    let normal_frame = Duration::from_nanos(16666667); // makes 60 fps
+    let mut frame_count: u128 = 0;
+    let mut fps: u8 = 0;
+    let mut secs = 0;
     let mut event_pump = sdl_context.event_pump()?;
     let mut running = true;
+    let start_time = Instant::now();
     while running {
         let frame_time = Instant::now();
 
@@ -356,15 +358,20 @@ fn main() -> Result<(), String> {
         )?;
         canvas.present();
 
-        let target_frame = Duration::from_nanos(16666667);
-        while frame_time.elapsed() < target_frame {
-            std::thread::sleep(Duration::from_micros(100));
+        let target_frames = start_time.elapsed().as_micros() / 16667;
+        // only pause if we're on track for 60fps
+        if frame_count >= target_frames {
+            while frame_time.elapsed() < normal_frame {
+                std::thread::sleep(Duration::from_micros(100));
+            }    
         }
         frame_count += 1;
-        if second_time.elapsed() >= Duration::from_secs(1) {
-            second_time = Instant::now();
-            println!("frames: {}", frame_count);
-            frame_count = 0;
+        fps += 1;
+
+        if start_time.elapsed().as_secs() > secs {
+            secs = start_time.elapsed().as_secs();
+            println!("fps: {}", fps);
+            fps = 0;
         }
         if frame_time.elapsed() > Duration::from_millis(18) {
             println!("big frame size: {}", frame_time.elapsed().as_millis());
