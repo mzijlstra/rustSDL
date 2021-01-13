@@ -7,6 +7,7 @@ use sdl2::keyboard::Keycode;
 use sdl2::rect::Point;
 use sdl2::rect::Rect;
 use sdl2::video::FullscreenType;
+use sdl2::surface::Surface;
 use std::path::Path;
 use std::time::Duration;
 use std::time::Instant;
@@ -77,29 +78,24 @@ fn main() -> Result<(), String> {
         .map_err(|e| e.to_string())?;
 
     let texture_creator = canvas.texture_creator();
-    //canvas.set_draw_color(sdl2::pixels::Color::RGBA(0, 0, 0, 255));
+    let tile_size = (16, 16);
 
-    // sprites and background form: https://opengameart.org/content/space-ship-shooter-pixel-art-assets
+    // sprites form: https://opengameart.org/content/space-ship-shooter-pixel-art-assets
     let ship_texture = texture_creator.load_texture(Path::new("assets/ship-sheet.png"))?;
     let flame_texture = texture_creator.load_texture(Path::new("assets/flame-sheet.png"))?;
-    let bg_texture = texture_creator.load_texture(Path::new("assets/desert-background.png"))?;
+    let bg_tiles = texture_creator.load_texture(Path::new("assets/desert_tiles.png"))?;
+    let mut bg_canvas = Surface::new(1280,720).into_canvas();
 
     // background
-    let source_bg = Rect::new(0, 0, 272, 300);
-    let mut dest_bg_array: [Rect; 3] = [
-        Rect::new(0, 0, 272, 300),
-        Rect::new(272, 0, 272, 300),
-        Rect::new(544, 0, 272, 300),
-    ];
+    let source_bg = Rect::new(0, 0, tile_size.0, tile_size.1);
+    let dest_bg = Rect::new(0, 0, tile_size.0, tile_size.1);
 
     // ship related
-    let sprite_tile_size = (16, 16);
-
     let mut player = Player {
-        source: Rect::new(32, 0, sprite_tile_size.0, sprite_tile_size.1),
-        dest: Rect::new(0, 0, sprite_tile_size.0, sprite_tile_size.1),
-        flame_source: Rect::new(0, 0, sprite_tile_size.0, sprite_tile_size.1),
-        flame_dest: Rect::new(0, 0, sprite_tile_size.0, sprite_tile_size.1),
+        source: Rect::new(32, 0, tile_size.0, tile_size.1),
+        dest: Rect::new(0, 0, tile_size.0, tile_size.1),
+        flame_source: Rect::new(0, 0, tile_size.0, tile_size.1),
+        flame_dest: Rect::new(0, 0, tile_size.0, tile_size.1),
         ..Default::default()
     };
     player.dest.center_on(Point::new(
@@ -222,19 +218,17 @@ fn main() -> Result<(), String> {
                 Event::KeyDown {
                     keycode: Some(Keycode::F),
                     ..
-                } => {
-                    match canvas.window().fullscreen_state() {
-                        FullscreenType::Off => {
-                            canvas.window_mut().set_fullscreen(FullscreenType::True)?;
-                        }
-                        FullscreenType::True => {
-                            canvas.window_mut().set_fullscreen(FullscreenType::Off)?;
-                        }
-                        FullscreenType::Desktop => {
-                            canvas.window_mut().set_fullscreen(FullscreenType::Off)?;
-                        }
+                } => match canvas.window().fullscreen_state() {
+                    FullscreenType::Off => {
+                        canvas.window_mut().set_fullscreen(FullscreenType::True)?;
                     }
-                }
+                    FullscreenType::True => {
+                        canvas.window_mut().set_fullscreen(FullscreenType::Off)?;
+                    }
+                    FullscreenType::Desktop => {
+                        canvas.window_mut().set_fullscreen(FullscreenType::Off)?;
+                    }
+                },
                 _ => {}
             }
         }
@@ -263,7 +257,7 @@ fn main() -> Result<(), String> {
 
         if player.down {
             let delta_y = 1;
-            if ship_y + delta_y < 8 + window_actual_size.1 as i32 - sprite_tile_size.1 as i32 {
+            if ship_y + delta_y < 8 + window_actual_size.1 as i32 - tile_size.1 as i32 {
                 ship_y = ship_y + delta_y;
             }
             player.down_count += 1;
@@ -304,7 +298,7 @@ fn main() -> Result<(), String> {
             }
             player.right_count += 1;
             let delta_x = 1;
-            if ship_x + delta_x < window_actual_size.0 as i32 - sprite_tile_size.0 as i32 {
+            if ship_x + delta_x < window_actual_size.0 as i32 - tile_size.0 as i32 {
                 ship_x += delta_x;
             }
         } else if player.left {
@@ -316,10 +310,10 @@ fn main() -> Result<(), String> {
         } else {
             player.flame = 1;
         }
-        player.source.set_x(player.tilt * sprite_tile_size.0 as i32);
+        player.source.set_x(player.tilt * tile_size.0 as i32);
         player
             .flame_source
-            .set_x(player.flame * sprite_tile_size.0 as i32);
+            .set_x(player.flame * tile_size.0 as i32);
         player.dest.set_x(ship_x);
         player.dest.set_y(ship_y);
         player.flame_dest.set_x(ship_x - 9);
@@ -363,7 +357,7 @@ fn main() -> Result<(), String> {
         if frame_count >= target_frames {
             while frame_time.elapsed() < normal_frame {
                 std::thread::sleep(Duration::from_micros(100));
-            }    
+            }
         }
         frame_count += 1;
         fps += 1;
