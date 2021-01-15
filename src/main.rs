@@ -4,10 +4,11 @@ use sdl2::event::Event;
 use sdl2::image::InitFlag;
 use sdl2::image::LoadTexture;
 use sdl2::keyboard::Keycode;
+use sdl2::pixels::PixelFormatEnum;
 use sdl2::rect::Point;
 use sdl2::rect::Rect;
-use sdl2::video::FullscreenType;
 use sdl2::surface::Surface;
+use sdl2::video::FullscreenType;
 use std::path::Path;
 use std::time::Duration;
 use std::time::Instant;
@@ -49,7 +50,7 @@ impl Default for Player {
 }
 
 fn main() -> Result<(), String> {
-    let window_desired_size: (i32, i32) = (640, 360);
+    let window_desired_size: (i32, i32) = (640, 480);
     let sdl_context = sdl2::init()?;
     let video_subsystem = sdl_context.video()?;
     let _image_context = sdl2::image::init(InitFlag::PNG)?;
@@ -83,12 +84,31 @@ fn main() -> Result<(), String> {
     // sprites form: https://opengameart.org/content/space-ship-shooter-pixel-art-assets
     let ship_texture = texture_creator.load_texture(Path::new("assets/ship-sheet.png"))?;
     let flame_texture = texture_creator.load_texture(Path::new("assets/flame-sheet.png"))?;
-    let bg_tiles = texture_creator.load_texture(Path::new("assets/desert_tiles.png"))?;
-    let mut bg_canvas = Surface::new(1280,720).into_canvas();
 
     // background
-    let source_bg = Rect::new(0, 0, tile_size.0, tile_size.1);
-    let dest_bg = Rect::new(0, 0, tile_size.0, tile_size.1);
+    let bg_surface = Surface::new(1280, 720, PixelFormatEnum::RGBA32)?;
+    let mut bg_canvas = bg_surface.into_canvas()?;
+    let bg_texture_creator = bg_canvas.texture_creator();
+    let bg_tiles = bg_texture_creator.load_texture(Path::new("assets/desert_tiles.png"))?;
+    let mut source_bg = Rect::new(0, 0, tile_size.0, tile_size.1);
+    let mut dest_bg = Rect::new(0, 0, tile_size.0, tile_size.1);
+
+    for row in 0..45 {
+        dest_bg.set_y(row * tile_size.1 as i32);
+        source_bg.set_y((row % 4) * 16);
+        for col in 0..80 {
+            source_bg.set_x((col % 2) * 16);
+            dest_bg.set_x(col * tile_size.0 as i32);
+            bg_canvas.copy_ex(&bg_tiles, Some(source_bg), Some(dest_bg), 0.0, None, false, false)?;
+        }
+    }
+    let bg = texture_creator.create_texture_from_surface(bg_canvas.surface()).unwrap();
+    source_bg.set_width(window_actual_size.0);
+    source_bg.set_height(window_actual_size.1);
+    dest_bg.set_width(window_actual_size.0);
+    dest_bg.set_height(window_actual_size.1);
+    dest_bg.set_x(0);
+    dest_bg.set_y(0);
 
     // ship related
     let mut player = Player {
@@ -220,26 +240,17 @@ fn main() -> Result<(), String> {
                     ..
                 } => match canvas.window().fullscreen_state() {
                     FullscreenType::Off => {
-                        canvas.window_mut().set_fullscreen(FullscreenType::True)?;
+                        canvas.window_mut().set_fullscreen(FullscreenType::Desktop)?;
                     }
                     FullscreenType::True => {
                         canvas.window_mut().set_fullscreen(FullscreenType::Off)?;
                     }
                     FullscreenType::Desktop => {
-                        canvas.window_mut().set_fullscreen(FullscreenType::Off)?;
+                        canvas.window_mut().set_fullscreen(FullscreenType::True)?;
                     }
                 },
                 _ => {}
             }
-        }
-
-        // move background parts
-        for dest_bg in &mut dest_bg_array {
-            let mut bg_x = dest_bg.x();
-            if bg_x - 1 < -272 {
-                bg_x = 544;
-            }
-            dest_bg.set_x(bg_x - 1);
         }
 
         // move ship
@@ -311,9 +322,7 @@ fn main() -> Result<(), String> {
             player.flame = 1;
         }
         player.source.set_x(player.tilt * tile_size.0 as i32);
-        player
-            .flame_source
-            .set_x(player.flame * tile_size.0 as i32);
+        player.flame_source.set_x(player.flame * tile_size.0 as i32);
         player.dest.set_x(ship_x);
         player.dest.set_y(ship_y);
         player.flame_dest.set_x(ship_x - 9);
@@ -321,17 +330,9 @@ fn main() -> Result<(), String> {
 
         // draw on screen
         canvas.clear();
-        for dest_bg in &dest_bg_array {
-            canvas.copy_ex(
-                &bg_texture,
-                Some(source_bg),
-                Some(*dest_bg),
-                0.0,
-                None,
-                false,
-                false,
-            )?;
-        }
+        source_bg.set_x(0);
+        source_bg.set_y(0);
+        canvas.copy_ex(&bg, source_bg, dest_bg, 0.0, None, false, false)?;
         canvas.copy_ex(
             &flame_texture,
             Some(player.flame_source),
